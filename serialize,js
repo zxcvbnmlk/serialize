@@ -1,0 +1,123 @@
+function serialize(numbers) {
+  if (!Array.isArray(numbers)) throw new Error("Ожидался массив чисел");
+  const bits = numbers
+    .map((num) => {
+      if (num < 1 || num > 300) throw new Error("Число вне диапазона 1-300");
+      return num.toString(2).padStart(9, "0");
+      // Преобразуем каждое число в 9-битное бинарное представление (num.toString(2)),
+      // padStart(9, "0") добавляет ведущие нули (чтобы длина была ровно 9),
+    })
+    .join(""); // Полученные 9-битные строки объединяются в одну длинную строку из '0' и '1'
+
+  const blocks = [];
+  for (let i = 0; i < bits.length; i += 72) {
+    blocks.push(bits.slice(i, i + 72).padEnd(72, "0"));
+  }
+  // Разбиваем всю строку bits на блоки по 72 бита, если последний блок короче — дополняем его нулями до 72 бит
+  return blocks
+    .map((block) => {
+      const bytes = [];
+      for (let i = 0; i < block.length; i += 8) {
+        // Разбиваем его на 9 частей по 8 бит
+        bytes.push(parseInt(block.slice(i, i + 8), 2)); // Переводим каждый 8-битный фрагмент в десятичное число
+      }
+      return String.fromCharCode(...bytes); // Преобразуем байты в символы
+    })
+    .join("");
+}
+
+function deserialize(serialized) {
+  const bits = Array.from(serialized)
+    .map((ch) => ch.charCodeAt(0).toString(2).padStart(8, "0")) // Преобразуем каждый символ строки обратно в 8-битное двоичное представление
+    .join("");
+  const numbers = [];
+  for (let i = 0; i < bits.length; i += 9) {
+    // Считываем каждый блок по 9 бит
+    const num = parseInt(bits.slice(i, i + 9), 2); // Преобразуем его в число
+    if (num > 0) numbers.push(num); // Отфильтровываем возможные лишние 0, которые могли появиться из-за padEnd(72, '0') в сериализации.
+  }
+  return numbers;
+}
+
+// Функция для тестирования
+function runTest(name, inputArray) {
+  const serialized = serialize(inputArray);
+  const deserialized = deserialize(serialized);
+  const originalSize = JSON.stringify(inputArray).length;
+  const compressedSize = serialized.length;
+  const compressionRatio = ((compressedSize / originalSize) * 100).toFixed(2);
+  console.log(`--- ${name} ---`);
+  console.log(`Original length: ${originalSize}`);
+  console.log(`Compressed length: ${compressedSize}`);
+  console.log(`inputArray: ${[...inputArray].sort((a, b) => a - b).join(",")}`);
+  console.log(
+    `deserialized: ${[...deserialized].sort((a, b) => a - b).join(",")}`
+  );
+  const restored =
+    [...deserialized].sort((a, b) => a - b).join(",") ===
+    [...inputArray].sort((a, b) => a - b).join(",");
+  console.log(
+    `Compression: ${compressionRatio}%, Restored equals original: ${restored}`
+  );
+  console.log("");
+  return compressionRatio;
+}
+
+function averageCompressionRatio() {
+  const tests = [
+    { name: "10 sequential", data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+    {
+      name: "Random 50 with duplicates",
+      data: Array.from({ length: 50 }, () =>
+        Math.floor(Math.random() * 300 + 1)
+      ),
+    },
+    {
+      name: "Random 100 with duplicates",
+      data: Array.from({ length: 100 }, () =>
+        Math.floor(Math.random() * 300 + 1)
+      ),
+    },
+    {
+      name: "Random 500 with duplicates",
+      data: Array.from({ length: 500 }, () =>
+        Math.floor(Math.random() * 300 + 1)
+      ),
+    },
+    {
+      name: "Random 1000 with duplicates",
+      data: Array.from({ length: 1000 }, () =>
+        Math.floor(Math.random() * 300 + 1)
+      ),
+    },
+    {
+      name: "All one-digit numbers",
+      data: Array.from({ length: 9 }, (_, i) => i + 1),
+    },
+    {
+      name: "All two-digit numbers",
+      data: Array.from({ length: 90 }, (_, i) => i + 10),
+    },
+    {
+      name: "All three-digit numbers",
+      data: Array.from({ length: 201 }, (_, i) => i + 100),
+    },
+    {
+      name: "Each number 3 times (900 total)",
+      data: Array.from({ length: 300 }, (_, i) => [i + 1, i + 1, i + 1]).flat(),
+    },
+  ];
+
+  let totalRatio = 0;
+
+  for (const { name, data } of tests) {
+    const ratio = parseFloat(runTest(name, data));
+    totalRatio += ratio;
+  }
+
+  const average = (totalRatio / tests.length).toFixed(2);
+  console.log(`Average compression ratio across all tests: ${average}%`);
+  return average;
+}
+
+averageCompressionRatio();
